@@ -37,7 +37,7 @@ const createCheckoutSession = async (req, res) => {
         },
       ],
       // redirect urls after payment
-      success_url: `${process.env.CLIENT_URL}/success`,
+      success_url: `${process.env.CLIENT_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.CLIENT_URL}/cancel`,
       // store user info in metadata for webhook use
       metadata: { email, role, name },
@@ -91,5 +91,32 @@ const handleWebhook = async (req, res) => {
 
   res.json({ received: true });
 };
+// called from frontend after stripe redirects to success page
+const handlePaymentSuccess = async (req, res) => {
+  try {
+    const { session_id } = req.query;
 
-module.exports = { createCheckoutSession, handleWebhook };
+    // fetch session details from stripe
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+
+    if (session.payment_status === "paid") {
+      const { email, role, name } = session.metadata;
+
+      // update user as paid in db
+      await User.findOneAndUpdate({ email }, { isPaid: true });
+
+      // send pdf email
+      await sendEmailWithPDF({ name, email, role });
+
+      res.json({ success: true, message: "Email sent successfully" });
+    } else {
+      res.status(400).json({ success: false, message: "Payment not completed" });
+    }
+  } catch (error) {
+    console.error("Payment success error:", error.message);
+    res.status(500).json({ error: "Something went wrong" });
+  }
+};
+
+module.exports = { createCheckoutSession, handleWebhook, handlePaymentSuccess };
+

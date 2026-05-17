@@ -1,16 +1,60 @@
-import { Routes, Route } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Routes, Route, useSearchParams } from "react-router-dom";
+import axios from "axios";
 import RegisterForm from "./pages/RegisterForm";
 
-// success page shown after payment
-const Success = () => (
-  <div className="min-h-screen flex items-center justify-center bg-green-50">
-    <div className="text-center p-8 bg-white rounded-2xl shadow-lg">
-      <div className="text-6xl mb-4">🎉</div>
-      <h1 className="text-2xl font-bold text-green-600 mb-2">Payment Successful!</h1>
-      <p className="text-gray-600">Your PDF has been sent to your email. Please check your inbox.</p>
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
+
+// success page — calls backend with session_id to trigger email
+const Success = () => {
+  const [searchParams] = useSearchParams();
+  const [status, setStatus] = useState("loading");
+
+  useEffect(() => {
+    const session_id = searchParams.get("session_id");
+    if (!session_id) {
+      setStatus("error");
+      return;
+    }
+
+    // call backend to verify payment and send email
+    axios
+      .get(`${API_BASE}/payment/payment-success?session_id=${session_id}`)
+      .then(() => setStatus("success"))
+      .catch(() => setStatus("error"));
+  }, []);
+
+  if (status === "loading")
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-green-50">
+        <div className="text-center p-8 bg-white rounded-2xl shadow-lg">
+          <div className="text-5xl mb-4">⏳</div>
+          <h1 className="text-xl font-bold text-gray-700">Processing your order...</h1>
+        </div>
+      </div>
+    );
+
+  if (status === "error")
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-red-50">
+        <div className="text-center p-8 bg-white rounded-2xl shadow-lg">
+          <div className="text-5xl mb-4">❌</div>
+          <h1 className="text-xl font-bold text-red-500">Something went wrong</h1>
+          <p className="text-gray-500 mt-2">Please contact support.</p>
+        </div>
+      </div>
+    );
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-green-50">
+      <div className="text-center p-8 bg-white rounded-2xl shadow-lg">
+        <div className="text-6xl mb-4">🎉</div>
+        <h1 className="text-2xl font-bold text-green-600 mb-2">Payment Successful!</h1>
+        <p className="text-gray-600">Your PDF has been sent to your email. Please check your inbox.</p>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // cancel page shown if user cancels payment
 const Cancel = () => (
